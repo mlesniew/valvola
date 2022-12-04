@@ -2,16 +2,16 @@
 
 const char * to_c_str(const ValveState & s) {
     switch (s) {
-    case ValveState::open:
-        return "open";
-    case ValveState::closed:
-        return "closed";
-    case ValveState::opening:
-        return "opening";
-    case ValveState::closing:
-        return "closing";
-    default:
-        return "error";
+        case ValveState::open:
+            return "open";
+        case ValveState::closed:
+            return "closed";
+        case ValveState::opening:
+            return "opening";
+        case ValveState::closing:
+            return "closing";
+        default:
+            return "error";
     }
 }
 
@@ -24,53 +24,60 @@ void Valve::tick() {
     const bool switch_time_elapsed = (state.elapsed_millis() >= switch_time_millis);
 
     switch (state) {
-    case ValveState::closing:
-        if (!demand_open && switch_time_elapsed) {
-            state = ValveState::closed;
-            printf("Valve '%s' switching state to '%s'.\n", name.c_str(), to_c_str(state));
-        }
-    // fall through
+        case ValveState::closing:
+            if (!demand_open && switch_time_elapsed) {
+                state = ValveState::closed;
+                printf("Valve '%s' switching state to '%s'.\n", name.c_str(), to_c_str(state));
+            }
+        // fall through
 
-    case ValveState::closed:
-        if (demand_open) {
-            state = ValveState::opening;
-            printf("Valve '%s' switching state to '%s'.\n", name.c_str(), to_c_str(state));
-        }
-        break;
+        case ValveState::closed:
+            if (demand_open) {
+                state = ValveState::opening;
+                printf("Valve '%s' switching state to '%s'.\n", name.c_str(), to_c_str(state));
+            }
+            break;
 
-    case ValveState::opening:
-        if (demand_open && switch_time_elapsed) {
-            state = ValveState::open;
-            printf("Valve '%s' switching state to '%s'.\n", name.c_str(), to_c_str(state));
-        }
-    // fall through
+        case ValveState::opening:
+            if (demand_open && switch_time_elapsed) {
+                state = ValveState::open;
+                printf("Valve '%s' switching state to '%s'.\n", name.c_str(), to_c_str(state));
+            }
+        // fall through
 
-    case ValveState::open:
-        if (!demand_open) {
-            state = ValveState::closing;
-            printf("Valve '%s' switching state to '%s'.\n", name.c_str(), to_c_str(state));
-        }
-        break;
+        case ValveState::open:
+            if (!demand_open) {
+                state = ValveState::closing;
+                printf("Valve '%s' switching state to '%s'.\n", name.c_str(), to_c_str(state));
+            }
+            break;
 
-    default:
-        break;
+        default:
+            break;
     }
 
     output.set(demand_open);
 }
 
-DynamicJsonDocument Valve::to_json() const {
+DynamicJsonDocument Valve::get_config() const {
     DynamicJsonDocument json(64);
 
     json["name"] = name;
     json["switch_time"] = double(switch_time_millis) * 0.001;
+
+    return json;
+}
+
+DynamicJsonDocument Valve::get_status() const {
+    DynamicJsonDocument json = get_config();
+
     json["state"] = to_c_str(state);
 
     return json;
 }
 
-bool Valve::load(const JsonVariant & json) {
-    const auto object = json.as<JsonObject>();
+bool Valve::set_config(const JsonVariantConst & json) {
+    const auto object = json.as<JsonObjectConst>();
 
     if (object.containsKey("name")) {
         name = object["name"].as<std::string>();

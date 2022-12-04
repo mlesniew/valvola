@@ -1,0 +1,20 @@
+{
+    "valves": [
+        {
+            "name": "first",
+            "switch_time": 10
+        },
+        {
+            "name": "second",
+            "switch_time": 20
+        },
+        {
+            "name": "third",
+            "switch_time": 30
+        },
+        {
+            "name": "fourth",
+            "switch_time": 40
+        }
+    ]
+}
