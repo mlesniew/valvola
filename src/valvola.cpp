@@ -79,7 +79,7 @@ void setup_server() {
     });
 
     server.on(UriRegex("/config/valves/([0-9]+)"), [] {
-        const int idx = server.pathArg(0).toInt();
+        const unsigned int idx = server.pathArg(0).toInt();
 
         if (idx >= valves.size()) {
             server.send(404);
@@ -164,6 +164,14 @@ void setup_server() {
 
 void setup() {
     Serial.begin(9600);
+    Serial.println(F("\n\n"
+        "             _            _\n"
+        " /\\   /\\__ _| |_   _____ | | __ _\n"
+        " \\ \\ / / _` | \\ \\ / / _ \\| |/ _` |\n"
+        "  \\ V / (_| | |\\ V / (_) | | (_| |\n"
+        "   \\_/ \\__,_|_| \\_/ \\___/|_|\\__,_|\n"
+        "\n"
+        "   Valvola " __DATE__ " " __TIME__ "\n"));
 
     wifi_led.init();
 
