@@ -11,13 +11,23 @@
 #include <utils/io.h>
 #include <utils/json_config.h>
 #include <utils/wifi_control.h>
+#include <utils/shift_register.h>
 
 #include "valve.h"
 
-PinOutput<D0, true> relay_1;
-PinOutput<D5, true> relay_2;
-PinOutput<D6, true> relay_3;
-PinOutput<D7, true> relay_4;
+ShiftRegister<1> shift_register(
+    D6,  // data pin
+    D5,  // clock pin
+    D0,  // latch pin
+(uint8_t[1]) {
+    0b00001111,
+}  // inverted outputs
+);
+
+ShiftRegisterOutput relay_1{shift_register, 0};
+ShiftRegisterOutput relay_2{shift_register, 1};
+ShiftRegisterOutput relay_3{shift_register, 2};
+ShiftRegisterOutput relay_4{shift_register, 3};
 
 std::vector<Valve> valves = {
     Valve(relay_1, "valve 1", 5 * 60 * 1000),
@@ -163,6 +173,8 @@ void setup_server() {
 }
 
 void setup() {
+    shift_register.init();
+
     Serial.begin(9600);
     Serial.println(F("\n\n"
         "             _            _\n"
