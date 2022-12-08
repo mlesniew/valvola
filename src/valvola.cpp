@@ -186,7 +186,7 @@ void setup() {
         }
     }
 
-    const auto mode = WiFiInitMode::saved; // button ? WiFiInitMode::setup : WiFiInitMode::saved;
+    const auto mode = button ? WiFiInitMode::setup : WiFiInitMode::saved;
     wifi_control.init(mode, "valvola");
 
     setup_server();
