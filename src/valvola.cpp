@@ -12,6 +12,7 @@
 #include <utils/json_config.h>
 #include <utils/wifi_control.h>
 #include <utils/shift_register.h>
+#include <utils/reset_button.h>
 
 #include "valve.h"
 
@@ -37,6 +38,7 @@ std::vector<Valve> valves = {
 };
 
 PinInput<D1, true> button;
+ResetButton reset_button(button);
 
 PinOutput<D4, true> wifi_led;
 WiFiControl wifi_control(wifi_led);
@@ -174,6 +176,8 @@ void setup_server() {
 
 void setup() {
     shift_register.init();
+    reset_button.init();
+    wifi_led.init();
 
     Serial.begin(115200);
     Serial.println(F("\n\n"
@@ -184,8 +188,6 @@ void setup() {
         "   \\_/ \\__,_|_| \\_/ \\___/|_|\\__,_|\n"
         "\n"
         "   Valvola " __DATE__ " " __TIME__ "\n"));
-
-    wifi_led.init();
 
     LittleFS.begin();
 
