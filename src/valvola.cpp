@@ -175,7 +175,7 @@ void setup_server() {
 void setup() {
     shift_register.init();
 
-    Serial.begin(9600);
+    Serial.begin(115200);
     Serial.println(F("\n\n"
         "             _            _\n"
         " /\\   /\\__ _| |_   _____ | | __ _\n"
