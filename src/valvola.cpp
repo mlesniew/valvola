@@ -14,6 +14,7 @@
 #include <utils/shift_register.h>
 #include <utils/reset_button.h>
 
+#include "metrics.h"
 #include "valve.h"
 
 ShiftRegister<1> shift_register(
@@ -170,6 +171,9 @@ void setup_server() {
                 return;
         }
     });
+
+    metrics::prometheus.labels["module"] = "valvola";
+    metrics::prometheus.register_metrics_endpoint(server);
 
     server.begin();
 }

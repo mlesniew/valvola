@@ -1,4 +1,5 @@
 #include "valve.h"
+#include "metrics.h"
 
 const char * to_c_str(const ValveState & s) {
     switch (s) {
@@ -18,6 +19,10 @@ const char * to_c_str(const ValveState & s) {
 Valve::Valve(BinaryOutput & output, const std::string & name, const unsigned long switch_time_millis)
     : name(name), switch_time_millis(switch_time_millis),
       demand_open(false), output(output), state(ValveState::closed) {
+}
+
+Valve::~Valve() {
+    metrics::valve_state.remove({{"zone", name}});
 }
 
 void Valve::tick() {
@@ -57,6 +62,8 @@ void Valve::tick() {
     }
 
     output.set(demand_open);
+    metrics::valve_state[{{"zone", name}}].set(static_cast<typename std::underlying_type<ValveState>::type>((
+                ValveState)state));
 }
 
 DynamicJsonDocument Valve::get_config() const {
