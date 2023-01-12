@@ -180,8 +180,8 @@ void setup_server() {
 
 void setup() {
     shift_register.init();
-    reset_button.init();
     wifi_led.init();
+    wifi_led.set(true);
 
     Serial.begin(115200);
     Serial.println(F("\n\n"
@@ -191,7 +191,14 @@ void setup() {
         "  \\ V / (_| | |\\ V / (_) | | (_| |\n"
         "   \\_/ \\__,_|_| \\_/ \\___/|_|\\__,_|\n"
         "\n"
-        "   Valvola " __DATE__ " " __TIME__ "\n"));
+        "   Valvola " __DATE__ " " __TIME__ "\n"
+        "\n\n"
+        "Press and hold button now to enter WiFi setup.\n"
+        ));
+
+    delay(3000);
+    reset_button.init();
+    wifi_control.init(button ? WiFiInitMode::setup : WiFiInitMode::saved, "valvola");
 
     LittleFS.begin();
 
@@ -203,9 +210,6 @@ void setup() {
             valves[idx].set_config(valves_config[idx].as<JsonVariantConst>());
         }
     }
-
-    const auto mode = button ? WiFiInitMode::setup : WiFiInitMode::saved;
-    wifi_control.init(mode, "valvola");
 
     setup_server();
 }
