@@ -13,3 +13,6 @@
 [submodule "lib/pubsubclient"]
 	path = lib/pubsubclient
 	url = git@github.com:knolleary/pubsubclient.git
+[submodule "lib/valve"]
+	path = lib/valve
+	url = git@github.com:mlesniew/valve.git

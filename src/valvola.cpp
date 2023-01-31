@@ -7,15 +7,37 @@
 #include <uri/UriRegex.h>
 
 #include <ArduinoJson.h>
+#include <prometheus.h>
 
 #include <utils/io.h>
 #include <utils/json_config.h>
-#include <utils/wifi_control.h>
-#include <utils/shift_register.h>
 #include <utils/reset_button.h>
+#include <utils/shift_register.h>
+#include <utils/wifi_control.h>
 
-#include "metrics.h"
 #include "valve.h"
+
+Prometheus prometheus;
+
+class ValvolaValve: public Valve {
+    public:
+        using Valve::Valve;
+
+        virtual ~ValvolaValve() {
+            gauge_valve_state.remove({{"zone", name}});
+        }
+
+    protected:
+        virtual void on_state_change() const {
+            gauge_valve_state[{{"zone", name}}]
+                .set(static_cast<typename std::underlying_type<State>::type>((State)state));
+        }
+
+    private:
+        static PrometheusGauge gauge_valve_state;
+};
+
+PrometheusGauge ValvolaValve::gauge_valve_state(prometheus, "valve_state", "Valve state enum");
 
 ShiftRegister<1> shift_register(
     D6,  // data pin
@@ -31,11 +53,11 @@ ShiftRegisterOutput relay_2{shift_register, 1};
 ShiftRegisterOutput relay_3{shift_register, 2};
 ShiftRegisterOutput relay_4{shift_register, 3};
 
-std::vector<Valve> valves = {
-    Valve(relay_1, "valve 1", 5 * 60 * 1000),
-    Valve(relay_2, "valve 2", 5 * 60 * 1000),
-    Valve(relay_3, "valve 3", 5 * 60 * 1000),
-    Valve(relay_4, "valve 4", 5 * 60 * 1000),
+std::vector<ValvolaValve> valves = {
+    ValvolaValve(relay_1, "valve 1", 5 * 60 * 1000),
+    ValvolaValve(relay_2, "valve 2", 5 * 60 * 1000),
+    ValvolaValve(relay_3, "valve 3", 5 * 60 * 1000),
+    ValvolaValve(relay_4, "valve 4", 5 * 60 * 1000),
 };
 
 PinInput<D1, true> button;
@@ -172,8 +194,8 @@ void setup_server() {
         }
     });
 
-    metrics::prometheus.labels["module"] = "valvola";
-    metrics::prometheus.register_metrics_endpoint(server);
+    prometheus.labels["module"] = "valvola";
+    prometheus.register_metrics_endpoint(server);
 
     server.begin();
 }
