@@ -7,37 +7,31 @@
 #include <uri/UriRegex.h>
 
 #include <ArduinoJson.h>
-#include <prometheus.h>
+#include <PicoMQTT.h>
+#include <PicoPrometheus.h>
 
 #include <utils/io.h>
 #include <utils/json_config.h>
+#include <utils/periodic_run.h>
 #include <utils/reset_button.h>
 #include <utils/shift_register.h>
 #include <utils/wifi_control.h>
 
 #include "valve.h"
 
-Prometheus prometheus;
+PicoMQTT::Client & get_mqtt() {
+    static PicoMQTT::Client mqtt("calor.local", 1883, "valvola");
+    return mqtt;
+}
 
-class ValvolaValve: public Valve {
-    public:
-        using Valve::Valve;
+PicoMQTT::Publisher & get_mqtt_publisher() {
+    return get_mqtt();
+}
 
-        virtual ~ValvolaValve() {
-            gauge_valve_state.remove({{"zone", name}});
-        }
-
-    protected:
-        virtual void on_state_change() const {
-            gauge_valve_state[{{"zone", name}}]
-                .set(static_cast<typename std::underlying_type<State>::type>((State)state));
-        }
-
-    private:
-        static PrometheusGauge gauge_valve_state;
-};
-
-PrometheusGauge ValvolaValve::gauge_valve_state(prometheus, "valve_state", "Valve state enum");
+Prometheus & get_prometheus() {
+    static Prometheus prometheus;
+    return prometheus;
+}
 
 ShiftRegister<1> shift_register(
     D6,  // data pin
@@ -53,11 +47,11 @@ ShiftRegisterOutput relay_2{shift_register, 1};
 ShiftRegisterOutput relay_3{shift_register, 2};
 ShiftRegisterOutput relay_4{shift_register, 3};
 
-std::vector<ValvolaValve> valves = {
-    ValvolaValve(relay_1, "valve 1", 5 * 60 * 1000),
-    ValvolaValve(relay_2, "valve 2", 5 * 60 * 1000),
-    ValvolaValve(relay_3, "valve 3", 5 * 60 * 1000),
-    ValvolaValve(relay_4, "valve 4", 5 * 60 * 1000),
+std::vector<Valve> valves = {
+    Valve(relay_1, "valve 1", 5 * 60 * 1000),
+    Valve(relay_2, "valve 2", 5 * 60 * 1000),
+    Valve(relay_3, "valve 3", 5 * 60 * 1000),
+    Valve(relay_4, "valve 4", 5 * 60 * 1000),
 };
 
 PinInput<D1, true> button;
@@ -69,6 +63,12 @@ WiFiControl wifi_control(wifi_led);
 ESP8266WebServer server(80);
 
 const char CONFIG_FILE[] PROGMEM = "/config.json";
+
+PeriodicRun mqtt_publish_proc(30, 15, [] {
+    for (const auto & valve : valves) {
+        valve.update_mqtt();
+    }
+});
 
 void return_json(const JsonDocument & json, unsigned int code = 200) {
     String output;
@@ -95,6 +95,8 @@ void setup_server() {
         for (auto & valve : valves) {
             valve_status.add(valve.get_status());
         }
+
+        json["mqtt"] = get_mqtt().connected();
 
         return_json(json);
     });
@@ -153,49 +155,8 @@ void setup_server() {
         }
     });
 
-    server.on("/valves", [] {
-        StaticJsonDocument<512> json;
-
-        switch (server.method()) {
-            case HTTP_PUT:
-            case HTTP_POST: {
-                    const auto error = deserializeJson(json, server.arg("plain"));
-
-                    if (error) {
-                        server.send(400, "text/plain", error.f_str());
-                        return;
-                    }
-
-                    for (const JsonPair kv : json.as<JsonObject>()) {
-                        const std::string name = kv.key().c_str();
-                        for (auto & valve : valves) {
-                            if (valve.name == name) {
-                                valve.demand_open = kv.value().as<bool>();
-                                valve.tick();
-                                break;
-                            }
-                        }
-                    }
-                }
-            // fall through
-            case HTTP_GET: {
-                    json.clear();
-                    for (auto & valve : valves) {
-                        json[valve.name] = to_c_str(valve.get_state());
-                    }
-
-                    return_json(json);
-                    return;
-                }
-
-            default:
-                server.send(405);
-                return;
-        }
-    });
-
-    prometheus.labels["module"] = "valvola";
-    prometheus.register_metrics_endpoint(server);
+    get_prometheus().labels["module"] = "valvola";
+    get_prometheus().register_metrics_endpoint(server);
 
     server.begin();
 }
@@ -234,12 +195,26 @@ void setup() {
     }
 
     setup_server();
+
+    get_mqtt().subscribe("valvola/valve/+/request", [](const char * topic, const char * payload) {
+        const std::string name = PicoMQTT::Client::get_topic_element(topic, 2).c_str();
+        const bool demand_open = (strcmp(payload, "open") == 0);
+        Serial.printf("Received request to %s valve %s.\n", demand_open ? "open" : "close", name.c_str());
+        for (auto & valve : valves) {
+            if (valve.get_name() == name) {
+                valve.demand_open = demand_open;
+                break;
+            }
+        }
+    });
 }
 
 void loop() {
-    server.handleClient();
     wifi_control.tick();
+    server.handleClient();
     for (auto & valve : valves) {
         valve.tick();
     }
+    get_mqtt().loop();
+    mqtt_publish_proc.tick();
 }
