@@ -2,7 +2,6 @@
 #include <string>
 
 #include <Arduino.h>
-#include <ESP8266WebServer.h>
 #include <LittleFS.h>
 #include <uri/UriRegex.h>
 
@@ -16,6 +15,7 @@
 #include <utils/reset_button.h>
 #include <utils/shift_register.h>
 #include <utils/wifi_control.h>
+#include <utils/rest.h>
 
 #include "valve.h"
 
@@ -60,7 +60,7 @@ ResetButton reset_button(button);
 PinOutput<D4, true> wifi_led;
 WiFiControl wifi_control(wifi_led);
 
-ESP8266WebServer server(80);
+RestfulWebServer server(80);
 
 const char CONFIG_FILE[] PROGMEM = "/config.json";
 
@@ -69,12 +69,6 @@ PeriodicRun mqtt_publish_proc(30, 15, [] {
         valve.update_mqtt();
     }
 });
-
-void return_json(const JsonDocument & json, unsigned int code = 200) {
-    String output;
-    serializeJson(json, output);
-    server.send(code, F("application/json"), output);
-}
 
 DynamicJsonDocument get_config() {
     DynamicJsonDocument json(1024);
@@ -98,10 +92,10 @@ void setup_server() {
 
         json["mqtt"] = get_mqtt().connected();
 
-        return_json(json);
+        server.sendJson(json);
     });
 
-    server.on("/config", HTTP_GET, [] { return_json(get_config()); });
+    server.on("/config", HTTP_GET, [] { server.sendJson(get_config()); });
 
     server.on("/config/save", HTTP_POST, [] {
         const auto json = get_config();
@@ -145,7 +139,7 @@ void setup_server() {
             // fall through
 
             case HTTP_GET: {
-                    return_json(valve.get_config());
+                    server.sendJson(valve.get_config());
                     return;
                 }
 
