@@ -8,14 +8,8 @@
 #include <ArduinoJson.h>
 #include <PicoMQTT.h>
 #include <PicoPrometheus.h>
-
-#include <utils/io.h>
-#include <utils/json_config.h>
-#include <utils/periodic_run.h>
-#include <utils/reset_button.h>
-#include <utils/shift_register.h>
-#include <utils/wifi_control.h>
-#include <utils/rest.h>
+#include <PicoUtils.h>
+#include <WiFiManager.h>
 
 #include "valve.h"
 
@@ -33,7 +27,7 @@ Prometheus & get_prometheus() {
     return prometheus;
 }
 
-ShiftRegister<1> shift_register(
+PicoUtils::ShiftRegister<1> shift_register(
     D6,  // data pin
     D5,  // clock pin
     D0,  // latch pin
@@ -42,10 +36,10 @@ ShiftRegister<1> shift_register(
 }  // inverted outputs
 );
 
-ShiftRegisterOutput relay_1{shift_register, 0};
-ShiftRegisterOutput relay_2{shift_register, 1};
-ShiftRegisterOutput relay_3{shift_register, 2};
-ShiftRegisterOutput relay_4{shift_register, 3};
+PicoUtils::ShiftRegisterOutput relay_1{shift_register, 0};
+PicoUtils::ShiftRegisterOutput relay_2{shift_register, 1};
+PicoUtils::ShiftRegisterOutput relay_3{shift_register, 2};
+PicoUtils::ShiftRegisterOutput relay_4{shift_register, 3};
 
 std::vector<Valve> valves = {
     Valve(relay_1, "valve 1", 5 * 60 * 1000),
@@ -54,17 +48,17 @@ std::vector<Valve> valves = {
     Valve(relay_4, "valve 4", 5 * 60 * 1000),
 };
 
-PinInput<D1, true> button;
-ResetButton reset_button(button);
+PicoUtils::PinInput<D1, true> button;
+PicoUtils::ResetButton reset_button(button);
 
-PinOutput<D4, true> wifi_led;
-WiFiControl wifi_control(wifi_led);
+PicoUtils::PinOutput<D4, true> wifi_led;
+PicoUtils::WiFiControl<WiFiManager> wifi_control(wifi_led);
 
-RestfulWebServer server(80);
+PicoUtils::RestfulServer<ESP8266WebServer> server(80);
 
 const char CONFIG_FILE[] PROGMEM = "/config.json";
 
-PeriodicRun mqtt_publish_proc(30, 15, [] {
+PicoUtils::PeriodicRun mqtt_publish_proc(30, 15, [] {
     for (const auto & valve : valves) {
         valve.update_mqtt();
     }
@@ -175,12 +169,12 @@ void setup() {
 
     delay(3000);
     reset_button.init();
-    wifi_control.init(button ? WiFiInitMode::setup : WiFiInitMode::saved, "valvola");
+    wifi_control.init(bool(button), "valvola");
 
     LittleFS.begin();
 
     {
-        const auto config = JsonConfigFile(LittleFS, FPSTR(CONFIG_FILE), 1024);
+        PicoUtils::JsonConfigFile<StaticJsonDocument<1024>> config(LittleFS, FPSTR(CONFIG_FILE));
 
         const auto valves_config = config["valves"].as<JsonArrayConst>();
         for (unsigned int idx = 0; idx < valves.size(); ++idx) {
